@@ -6,8 +6,11 @@ from aws_cdk import (
     aws_lambda as _lambda,
     aws_dynamodb as ddb,
     aws_lambda_event_sources as lambda_event_source,
+    aws_stepfunctions as sfn,
+    aws_stepfunctions_tasks as sfn_tasks,
     core
 )
+import uuid
 
 
 class CdkDemoStack(core.Stack):
@@ -50,4 +53,36 @@ class CdkDemoStack(core.Stack):
         # SQS event source to Function
         hello_lambda.add_event_source(sqs_event_source)
 
+        #Begin Step Functions
+
+        #Defining States
+        passx = sfn.Pass(self, "Pass State")
+
+        hwchoice = sfn.Choice(self, "Choice State")
         
+        pass_yes = sfn.Pass(self, "Yes")
+
+        fail_no = sfn.Fail(self, "No")
+
+        ddbputitem = sfn.Task(
+            self, "Put Item into DynamoDB Table",
+            task=sfn_tasks.DynamoPutItem(self, "PutItem",
+                item={'id': {str(uuid.uuid4())}},
+            table=requests_table.table_name
+            )
+        )
+
+        #Define State Machine
+
+        definition = passx \
+            .next(hwchoice
+                .when(sfn.Condition.IsBoolean("$.IsHelloWorldExample", "true") .next(pass_yes))
+                .when(sfn.Condition.IsBoolean("$.IsHelloWorldExample", "false") .next(fail_no))) \
+            .next(ddbputitem)
+
+          
+        statemachine = sfn.StateMachine(
+            self, "StateMachine for Hello World",
+            definition=definition,
+            timeout=core.Duration.seconds(30)
+        )
